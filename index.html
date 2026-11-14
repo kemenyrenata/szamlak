@@ -50,13 +50,11 @@ main{max-width:860px;margin:0 auto;padding:16px;}
 .stat .value{font-size:22px;font-weight:700;margin-top:2px;}
 .stat.warn .value{color:var(--red);}
 .month-nav{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px;}
-.month-nav button.nav{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;width:38px;height:32px;cursor:pointer;font-size:17px;font-weight:700;}
-.month-nav button.nav:hover{filter:brightness(0.96);}
-.month-nav h2{font-size:17px;cursor:pointer;}
-.month-nav h2:hover{text-decoration:underline;}
-.month-nav .curtag{font-size:11px;color:var(--muted);font-weight:400;margin-left:8px;}
+.month-nav button{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;width:34px;height:30px;cursor:pointer;font-size:16px;font-weight:700;}
+.month-nav h2{font-size:17px;}
 ul.items{list-style:none;}
 li.item{background:var(--card);border:1px solid var(--border);border-left:5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.item .icon{width:42px;height:42px;border-radius:11px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .item .info{flex:1;min-width:180px;}
 .item .name{font-weight:700;}
 .item .cat{display:inline-block;font-size:11px;font-weight:600;color:var(--purple);background:var(--purple-light);border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px;}
@@ -116,9 +114,9 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
     </div>
     <div class="summary" id="summary"></div>
     <div class="month-nav">
-      <button class="nav" id="prevBtn" title="Previous month">‹</button>
-      <h2 id="monthLabel" title="Click to return to current month"></h2>
-      <button class="nav" id="nextBtn" title="Next month">›</button>
+      <button onclick="shiftMonth(-1)" title="Previous month">‹</button>
+      <h2 id="monthLabel"></h2>
+      <button onclick="shiftMonth(1)" title="Next month">›</button>
     </div>
     <div id="checklist"></div>
   </div>
@@ -215,6 +213,7 @@ let curAcct=null, viewOffset=0;
 let confirmCb=null, editAcctId=null, provEditId=null, receiveKey=null;
 const MS_DAY=86400000;
 const BASE_CATS=["Electricity","Water","Gas","Heating","Internet","Phone","TV","Rent","Property tax","Insurance","Garbage","Sewage","Maintenance","Subscription","Other"];
+const CAT_ICONS={Electricity:"⚡",Water:"💧",Gas:"🔥",Heating:"🌡️",Internet:"🌐",Phone:"📱",TV:"📺",Rent:"🏠","Property tax":"🏛️",Insurance:"🛡️",Garbage:"🗑️",Sewage:"🚰",Maintenance:"🔧",Subscription:"🎬",Other:"📄"};
 
 function storageOk(){ try{localStorage.setItem("__t","1");localStorage.removeItem("__t");return true;}catch(e){return false;} }
 const HAS_STORAGE=storageOk();
@@ -239,6 +238,7 @@ function ft(n){return n==null||n===""?"—":Number(n).toLocaleString("hu-HU")+" 
 function ekey(a,mk,p){return a+"|"+mk+"|"+p;}
 function mkDateOf(mk){return new Date(+mk.slice(0,4),+mk.slice(5,7)-1,1);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function catIcon(cat){return CAT_ICONS[cat]||"📄";}
 function allCats(){
   const s=new Set(BASE_CATS);
   store.providers.forEach(p=>{ if(p.cat)s.add(p.cat); });
@@ -286,10 +286,6 @@ function init(){
   }
 }
 
-/* ---------- month navigation ---------- */
-function shiftMonth(d){viewOffset+=d;render();}
-function gotoCurrentMonth(){viewOffset=0;render();}
-
 /* ---------- status logic ---------- */
 function expectsIn(p,mk){
   if(p.active===false)return false;
@@ -322,10 +318,7 @@ function render(){
   renderFilters();
   const acct=acctById(curAcct);
   const mk=monthKey(viewOffset),mkDate=mk.date,today=new Date();
-  const isCurrent=viewOffset===0;
-  document.getElementById("monthLabel").innerHTML=
-    esc(fmtMonth(mkDate)+(acct?" · "+esc(acct.name):""))+
-    (isCurrent?'<span class="curtag">current month</span>':'');
+  document.getElementById("monthLabel").textContent=fmtMonth(mkDate)+(acct?" · "+esc(acct.name):"");
 
   const fCat=document.getElementById("filterCat").value;
   const fVendor=document.getElementById("filterProv").value;
@@ -357,6 +350,7 @@ function render(){
       const pct=diff!=null&&r.p.amount?Math.abs(diff)/r.p.amount:0;
       html+='<li class="item" style="border-left-color:'+
         (r.st==="paid"?"var(--green)":r.st==="received"?"var(--amber)":(r.st==="missing"||r.st==="overdue")?"var(--red)":"var(--blue)")+'">'+
+        '<div class="icon">'+catIcon(r.p.cat)+'</div>'+
         '<div class="info"><div class="name"><span class="cat">'+esc(r.p.cat||"Other")+'</span>'+esc(provDisplay(r.p))+' <span class="badge '+r.st+'">'+r.st.toUpperCase()+'</span></div>'+
         '<div class="meta">'+(r.p.vendor?esc(r.p.vendor)+" · ":"")+FREQ_LABEL[r.p.freq]+' · arrives ~day '+(r.p.arrival||5)+' · due '+(r.entry&&r.entry.due?("until "+r.entry.due):"+ "+(r.p.window||20)+" days")+'</div></div>'+
         '<div class="amount">'+(r.entry&&r.entry.actual!=null?ft(r.entry.actual):"")+
@@ -392,7 +386,7 @@ function renderFilters(){
   const cats=allCats();
   const catSel=document.getElementById("filterCat");
   const prevC=catSel.value;
-  catSel.innerHTML='<option value="">All</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(c===prevC?" selected":"")+'>'+esc(c)+'</option>').join("");
+  catSel.innerHTML='<option value="">All</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(c===prevC?" selected":"")+'>'+catIcon(c)+' '+esc(c)+'</option>').join("");
   const vendors=new Set(store.providers.filter(p=>p.acct===curAcct&&p.vendor).map(p=>p.vendor));
   const vSel=document.getElementById("filterProv");
   const prevV=vSel.value;
@@ -462,10 +456,10 @@ function openProviderDlg(id){
   const p=id?store.providers.find(x=>x.id===id):null;
   sel.value=p?p.acct:curAcct;
   const catSel=document.getElementById("pCat");
-  catSel.innerHTML=allCats().map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");
+  catSel.innerHTML=allCats().map(c=>'<option value="'+esc(c)+'">'+catIcon(c)+' '+esc(c)+'</option>').join("");
   if(p&&p.cat&&!BASE_CATS.includes(p.cat)){
     if(!Array.from(catSel.options).some(o=>o.value===p.cat)){
-      const o=document.createElement("option");o.value=p.cat;o.textContent=p.cat;catSel.appendChild(o);
+      const o=document.createElement("option");o.value=p.cat;o.textContent=catIcon(p.cat)+" "+p.cat;catSel.appendChild(o);
     }
   }
   catSel.value=p?(p.cat||"Other"):"Electricity";
@@ -579,15 +573,6 @@ function askReset(){
 }
 
 init();
-/* month navigation bound directly, so it can never be lost */
-document.getElementById("prevBtn").addEventListener("click",()=>shiftMonth(-1));
-document.getElementById("nextBtn").addEventListener("click",()=>shiftMonth(1));
-document.getElementById("monthLabel").addEventListener("click",gotoCurrentMonth);
-document.addEventListener("keydown",e=>{
-  if(document.getElementById("overlay").style.display==="flex")return;
-  if(e.key==="ArrowLeft")shiftMonth(-1);
-  if(e.key==="ArrowRight")shiftMonth(1);
-});
 render();
 </script>
 </body>
