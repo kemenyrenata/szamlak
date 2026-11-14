@@ -49,9 +49,12 @@ main{max-width:860px;margin:0 auto;padding:16px;}
 .stat .label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
 .stat .value{font-size:22px;font-weight:700;margin-top:2px;}
 .stat.warn .value{color:var(--red);}
-.month-nav{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px;}
-.month-nav button{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;width:34px;height:30px;cursor:pointer;font-size:16px;font-weight:700;}
-.month-nav h2{font-size:17px;}
+.month-nav{display:flex;align-items:center;justify-content:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;margin-bottom:14px;}
+.month-nav button.nav{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;width:34px;height:30px;cursor:pointer;font-size:16px;font-weight:700;}
+.month-nav #monthLabel{font-size:17px;font-weight:600;cursor:pointer;padding:4px 12px;border-radius:8px;}
+.month-nav #monthLabel:hover{background:var(--purple-light);color:var(--purple);}
+.month-nav .today{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12.5px;font-weight:700;}
+.month-nav .today:hover{filter:brightness(.95);}
 ul.items{list-style:none;}
 li.item{background:var(--card);border:1px solid var(--border);border-left:5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .item .icon{width:42px;height:42px;border-radius:11px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
@@ -86,6 +89,17 @@ li.item{background:var(--card);border:1px solid var(--border);border-left:5px so
 .chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;}
 .chk label{margin:0;color:var(--text);}
 .hint{font-size:12px;color:var(--muted);margin-top:4px;}
+/* month picker */
+.picker-year{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.picker-year span{font-size:18px;font-weight:700;}
+.picker-year button{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;width:34px;height:30px;cursor:pointer;font-size:16px;font-weight:700;}
+.picker-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.picker-grid button{padding:12px 0;border:1px solid var(--border);background:var(--card);border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text);}
+.picker-grid button:hover{border-color:var(--purple);color:var(--purple);}
+.picker-grid button.sel{background:var(--purple);color:#fff;border-color:var(--purple);}
+.picker-grid button.cur{box-shadow:0 0 0 2px var(--purple) inset;}
+.picker-quick{margin-top:14px;text-align:center;}
+.picker-quick button{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;}
 footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
 </style>
 </head>
@@ -108,15 +122,16 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
     <div class="account-tabs" id="acctTabs"></div>
     <div class="filters">
       <label>Category:</label>
-      <select id="filterCat" onchange="render()"><option value="">All</option></select>
+      <select id="filterCat"><option value="">All</option></select>
       <label>Service provider:</label>
-      <select id="filterProv" onchange="render()"><option value="">All</option></select>
+      <select id="filterProv"><option value="">All</option></select>
     </div>
     <div class="summary" id="summary"></div>
     <div class="month-nav">
-      <button onclick="shiftMonth(-1)" title="Previous month">‹</button>
-      <h2 id="monthLabel"></h2>
-      <button onclick="shiftMonth(1)" title="Next month">›</button>
+      <button class="nav" id="btnPrev" title="Previous month">‹</button>
+      <span id="monthLabel" title="Click to pick any month">…</span>
+      <button class="nav" id="btnNext" title="Next month">›</button>
+      <button class="today" id="btnToday" title="Jump to current month">Today</button>
     </div>
     <div id="checklist"></div>
   </div>
@@ -145,7 +160,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <label>Account</label>
       <select id="pAcct"></select>
       <label>Category</label>
-      <select id="pCat" onchange="catChanged()"></select>
+      <select id="pCat"></select>
       <input id="pCatCustom" placeholder="Custom category name" style="display:none;margin-top:6px;">
       <label>Service provider (company / sender)</label>
       <input id="pVendor" placeholder="e.g. Green Energy Co., Budapest Waterworks…">
@@ -204,13 +219,27 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       </div>
     </div>
   </div>
+
+  <div class="modal" id="pickerModal">
+    <div class="body">
+      <h3>Go to month</h3>
+      <div class="picker-year">
+        <button id="pyPrev" title="Previous year">‹</button>
+        <span id="pyLabel">2026</span>
+        <button id="pyNext" title="Next year">›</button>
+      </div>
+      <div class="picker-grid" id="pyGrid"></div>
+      <div class="picker-quick"><button id="pyToday">↩ Today</button></div>
+      <div class="btns"><span class="spacer"></span><button onclick="closeModal()">Close</button></div>
+    </div>
+  </div>
 </div>
 
 <script>
 "use strict";
 let store=null, memStore=null;
 let curAcct=null, viewOffset=0;
-let confirmCb=null, editAcctId=null, provEditId=null, receiveKey=null;
+let confirmCb=null, editAcctId=null, provEditId=null, receiveKey=null, pickerYear=null;
 const MS_DAY=86400000;
 const BASE_CATS=["Electricity","Water","Gas","Heating","Internet","Phone","TV","Rent","Property tax","Insurance","Garbage","Sewage","Maintenance","Subscription","Other"];
 const CAT_ICONS={Electricity:"⚡",Water:"💧",Gas:"🔥",Heating:"🌡️",Internet:"🌐",Phone:"📱",TV:"📺",Rent:"🏠","Property tax":"🏛️",Insurance:"🛡️",Garbage:"🗑️",Sewage:"🚰",Maintenance:"🔧",Subscription:"🎬",Other:"📄"};
@@ -227,8 +256,11 @@ function load(){
 }
 function uid(){return Math.random().toString(36).slice(2,10);}
 function acctById(id){return store.accounts.find(a=>a.id===id);}
+// monthKey derived from explicit base date arithmetic, offset applied via new Date()
+function baseNow(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); }
 function monthKey(off){
-  const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()+off);
+  const b=baseNow();
+  const d=new Date(b.getFullYear(), b.getMonth()+off, 1);
   return {key:d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0"),date:d};
 }
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -259,8 +291,6 @@ function openModal(id){
   if(f)setTimeout(()=>f.focus(),30);
 }
 function closeModal(){document.getElementById("overlay").style.display="none";}
-document.getElementById("overlay").addEventListener("mousedown",e=>{ if(e.target.id==="overlay")closeModal(); });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape")closeModal(); });
 function showErr(id,msg){const el=document.getElementById(id);el.textContent=msg;el.style.display="block";}
 function hideErr(id){document.getElementById(id).style.display="none";}
 function askConfirm(title,text,okLabel,cb){
@@ -342,7 +372,7 @@ function render(){
 
   const list=document.getElementById("checklist");
   if(rows.length===0){
-    list.innerHTML='<div class="empty">'+(fCat||fVendor?"No invoices match the current filters in ":"No invoices expected for ")+(fCat||fVendor?"":(acct?esc(acct.name)+" in ":""))+fmtMonth(mkDate)+'.<br>'+(fCat||fVendor?"Clear the filters above, or":"Add a provider or use ‹ › to browse other months.")+'</div>';
+    list.innerHTML='<div class="empty">'+(fCat||fVendor?"No invoices match the current filters in ":"No invoices expected for ")+(fCat||fVendor?"":(acct?esc(acct.name)+" in ":""))+fmtMonth(mkDate)+'.<br>'+(fCat||fVendor?"Clear the filters above, or":"Add a provider, use ‹ ›, or click the month name to jump anywhere.")+'</div>';
   }else{
     let html='<ul class="items">';
     rows.forEach(r=>{
@@ -369,24 +399,27 @@ function renderTabs(){
     b.className="tab"+(a.id===curAcct?" active":"");
     if(a.id===curAcct){
       b.innerHTML='<span>'+esc(a.name)+'</span>'+
-        '<span class="mini" title="Rename account" onclick="event.stopPropagation();openAccountDlg(\''+a.id+'\')">✎</span>'+
-        (store.accounts.length>1?'<span class="mini" title="Delete account" onclick="event.stopPropagation();askDeleteAccount(\''+a.id+'\')">🗑</span>':"");
+        '<span class="mini" title="Rename account">✎</span>'+
+        (store.accounts.length>1?'<span class="mini" title="Delete account">🗑</span>':"");
+      b.querySelector(".mini[title='Rename account']").addEventListener("click",ev=>{ev.stopPropagation();openAccountDlg(a.id);});
+      const del=b.querySelector(".mini[title='Delete account']");
+      if(del)del.addEventListener("click",ev=>{ev.stopPropagation();askDeleteAccount(a.id);});
     }else{
       b.textContent=a.name;
     }
-    b.onclick=()=>{curAcct=a.id;viewOffset=0;render();};
+    b.addEventListener("click",()=>{curAcct=a.id;viewOffset=0;render();});
     tabs.appendChild(b);
   });
   const add=document.createElement("button");
   add.className="addtab";add.textContent="＋ Add account";
-  add.onclick=()=>openAccountDlg();
+  add.addEventListener("click",()=>openAccountDlg());
   tabs.appendChild(add);
 }
 function renderFilters(){
   const cats=allCats();
   const catSel=document.getElementById("filterCat");
   const prevC=catSel.value;
-  catSel.innerHTML='<option value="">All</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(c===prevC?" selected":"")+'>'+catIcon(c)+' '+esc(c)+'</option>').join("");
+  catSel.innerHTML='<option value="">All</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(c===prevC?" selected":"")+'>'+esc(c)+'</option>').join("");
   const vendors=new Set(store.providers.filter(p=>p.acct===curAcct&&p.vendor).map(p=>p.vendor));
   const vSel=document.getElementById("filterProv");
   const prevV=vSel.value;
@@ -394,14 +427,57 @@ function renderFilters(){
 }
 function stat(l,v,warn){return '<div class="stat'+(warn?" warn":"")+'"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>';}
 function actionsFor(r){
-  if(r.st==="paid")return '<button onclick="undo(\''+r.k+'\')">↩ Undo</button>';
-  let h="";
-  if(r.st!=="received")h+='<button class="primary" onclick="openReceive(\''+r.k+'\')">✓ Received</button>';
-  if(r.st==="received"||r.st==="overdue")h+='<button class="primary" onclick="markPaid(\''+r.k+'\')">💰 Paid</button>';
-  if(r.st==="missing")h+='<button onclick="openReceive(\''+r.k+'\')">Not missing?</button>';
-  h+='<button onclick="openProviderDlg(\''+r.p.id+'\')" title="Edit provider">✎</button>';
-  h+='<button onclick="askRemoveEntry(\''+r.k+'\')" title="Remove from this month">✕</button>';
-  return h;
+  const aid=r.p.id, key=r.k;
+  if(r.st==="paid"){
+    return btn("↩ Undo","",()=>undo(key));
+  }
+  let acts=[];
+  if(r.st!=="received")acts.push(btn("✓ Received","primary",()=>openReceive(key)));
+  if(r.st==="received"||r.st==="overdue")acts.push(btn("💰 Paid","primary",()=>markPaid(key)));
+  if(r.st==="missing")acts.push(btn("Not missing?","",()=>openReceive(key)));
+  acts.push(btn("✎","",()=>openProviderDlg(aid),"Edit provider"));
+  acts.push(btn("✕","",()=>askRemoveEntry(key),"Remove from this month"));
+  return acts.join("");
+}
+function btn(label,cls,fn,title){
+  const b=document.createElement("button");
+  if(cls)b.className=cls;
+  b.textContent=label;
+  if(title)b.title=title;
+  b.addEventListener("click",ev=>{ev.stopPropagation();fn();});
+  return b.outerHTML;
+}
+
+/* ---------- month navigation ---------- */
+function shiftMonth(d){viewOffset+=d;render();}
+function goToday(){viewOffset=0;render();}
+function gotoMonth(y,m){ // m: 1-12
+  const b=baseNow();
+  viewOffset=(y-b.getFullYear())*12+(m-1-b.getMonth());
+  render();
+}
+
+/* month picker */
+function openPicker(){
+  const mk=monthKey(viewOffset);
+  pickerYear=mk.date.getFullYear();
+  renderPicker();
+  openModal("pickerModal");
+}
+function renderPicker(){
+  document.getElementById("pyLabel").textContent=pickerYear;
+  const grid=document.getElementById("pyGrid");
+  grid.innerHTML="";
+  const cur=new Date();
+  const sel=monthKey(viewOffset).date;
+  for(let m=0;m<12;m++){
+    const b=document.createElement("button");
+    b.textContent=MONTHS[m];
+    if(pickerYear===cur.getFullYear()&&m===cur.getMonth())b.classList.add("cur");
+    if(pickerYear===sel.getFullYear()&&m===sel.getMonth())b.classList.add("sel");
+    b.addEventListener("click",()=>{gotoMonth(pickerYear,m+1);closeModal();});
+    grid.appendChild(b);
+  }
 }
 
 /* ---------- accounts ---------- */
@@ -456,14 +532,13 @@ function openProviderDlg(id){
   const p=id?store.providers.find(x=>x.id===id):null;
   sel.value=p?p.acct:curAcct;
   const catSel=document.getElementById("pCat");
-  catSel.innerHTML=allCats().map(c=>'<option value="'+esc(c)+'">'+catIcon(c)+' '+esc(c)+'</option>').join("");
+  catSel.innerHTML=allCats().map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");
   if(p&&p.cat&&!BASE_CATS.includes(p.cat)){
     if(!Array.from(catSel.options).some(o=>o.value===p.cat)){
-      const o=document.createElement("option");o.value=p.cat;o.textContent=catIcon(p.cat)+" "+p.cat;catSel.appendChild(o);
+      const o=document.createElement("option");o.value=p.cat;o.textContent=p.cat;catSel.appendChild(o);
     }
   }
   catSel.value=p?(p.cat||"Other"):"Electricity";
-  catChanged();
   if(p&&p.cat&&!BASE_CATS.includes(p.cat))document.getElementById("pCatCustom").value=p.cat;
   document.getElementById("pVendor").value=p?(p.vendor||""):"";
   document.getElementById("pLabel").value=p?(p.label||""):"";
@@ -474,10 +549,6 @@ function openProviderDlg(id){
   document.getElementById("pAnchor").value=p?(p.anchor||monthKey(0).key):monthKey(0).key;
   document.getElementById("pActive").checked=p?p.active!==false:true;
   openModal("providerModal");
-}
-function catChanged(){
-  const sel=document.getElementById("pCat");
-  document.getElementById("pCatCustom").style.display=(sel.value==="Other")?"":"none";
 }
 function saveProvider(){
   const vendor=document.getElementById("pVendor").value.trim();
@@ -507,10 +578,10 @@ function openReceive(k){
   const [,mk,pid]=k.split("|");
   const p=store.providers.find(x=>x.id===pid);
   const d=mkDateOf(mk);
-  d.setDate(Math.min(p.arrival||5,28));
+  d=new Date(d.getFullYear(),d.getMonth(),Math.min(p.arrival||5,28));
   d.setDate(d.getDate()+(p.window||20));
   document.getElementById("rAmount").value=(p.amount!=null?String(p.amount):"");
-  document.getElementById("rDue").value=d.toISOString().slice(0,10);
+  document.getElementById("rDue").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
   const diffEl=document.getElementById("rDiff");
   const updateDiff=val=>{
     if(p.amount!=null&&val!==""){
@@ -572,7 +643,26 @@ function askReset(){
   });
 }
 
+/* ---------- wiring (all listeners attached here, no inline handlers on dynamic parts) ---------- */
+function wire(){
+  document.getElementById("btnPrev").addEventListener("click",()=>shiftMonth(-1));
+  document.getElementById("btnNext").addEventListener("click",()=>shiftMonth(1));
+  document.getElementById("btnToday").addEventListener("click",goToday);
+  document.getElementById("monthLabel").addEventListener("click",openPicker);
+  document.getElementById("pyPrev").addEventListener("click",()=>{pickerYear--;renderPicker();});
+  document.getElementById("pyNext").addEventListener("click",()=>{pickerYear++;renderPicker();});
+  document.getElementById("pyToday").addEventListener("click",()=>{goToday();closeModal();});
+  document.getElementById("overlay").addEventListener("mousedown",e=>{ if(e.target.id==="overlay")closeModal(); });
+  document.getElementById("filterCat").addEventListener("change",render);
+  document.getElementById("filterProv").addEventListener("change",render);
+  document.getElementById("pCat").addEventListener("change",()=>{
+    document.getElementById("pCatCustom").style.display=(document.getElementById("pCat").value==="Other")?"":"none";
+  });
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape")closeModal(); });
+}
+
 init();
+wire();
 render();
 </script>
 </body>
