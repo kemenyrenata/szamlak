@@ -312,7 +312,7 @@ function init(){
   store.providers.forEach(p=>{
     if(!p.cat&&!p.vendor&&p.name){ p.label=p.label||p.name; delete p.name; }
   });
-  if(store.accounts.length===0)curAcct="ALL";
+  if(!store.accounts.some(a=>a.id===curAcct))curAcct="ALL";
 }
 
 /* ---------- status logic ---------- */
@@ -348,7 +348,7 @@ function render(){
   const all=curAcct==="ALL";
   const acct=all?null:acctById(curAcct);
   const mk=monthKey(viewOffset),mkDate=mk.date,today=new Date();
-  document.getElementById("monthLabel").textContent=fmtMonth(mkDate)+(acct?" · "+esc(acct.name):(all&&store.accounts.length>1?" · All accounts":""));
+  document.getElementById("monthLabel").textContent=fmtMonth(mkDate)+(acct?" · "+esc(acct.name):(all?" · All accounts":""));
 
   const fCat=document.getElementById("filterCat").value;
   const fVendor=document.getElementById("filterProv").value;
@@ -374,7 +374,10 @@ function render(){
 
   const list=document.getElementById("checklist");
   if(rows.length===0){
-    list.innerHTML='<div class="empty">'+(fCat||fVendor?"No invoices match the current filters in ":"No invoices expected for ")+(fCat||fVendor?"":(acct?esc(acct.name)+" in ":fmtMonth(mkDate)+": "))+fmtMonth(mkDate)+'.<br>'+(fCat||fVendor?"Clear the filters above, or":"Add a provider, use ‹ ›, or click the month name to jump anywhere.")+'</div>';
+    let msg;
+    if(fCat||fVendor)msg="No invoices match the current filters in "+fmtMonth(mkDate)+".<br>Clear the filters above, or";
+    else msg="No invoices expected"+(acct?(" for "+esc(acct.name)):"")+" in "+fmtMonth(mkDate)+".<br>Add a provider, use ‹ ›, or click the month name to jump anywhere.";
+    list.innerHTML='<div class="empty">'+msg+'</div>';
   }else{
     let html='<ul class="items">';
     rows.forEach(r=>{
@@ -439,22 +442,25 @@ function renderFilters(){
   vSel.innerHTML='<option value="">All</option>'+Array.from(vendors).sort().map(v=>'<option value="'+esc(v)+'"'+(v===prevV?" selected":"")+'>'+esc(v)+'</option>').join("");
 }
 function stat(l,v,warn){return '<div class="stat'+(warn?" warn":"")+'"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>';}
+
+/* buttons rendered as plain HTML with data-attributes; clicks handled via delegation below */
 function actionsFor(r){
   if(r.st==="paid")
-    return actBtn("↩ Undo payment","",r.k,"undopay","Back to received");
+    return actBtn("↩ Undo payment",r.k,"undopay","Back to received","");
   let h="";
-  if(r.st!=="received")h+=actBtn("✓ Received","primary",r.k,"receive","");
+  if(r.st==="expected"||r.st==="missing")h+=actBtn("✓ Received",r.k,"receive","","primary");
   if(r.st==="received"||r.st==="overdue"){
-    h+=actBtn("💰 Paid","primary",r.k,"pay","");
-    h+=actBtn("↩ Not received","",r.k,"revert","Undo — back to expected");
+    h+=actBtn("💰 Paid",r.k,"pay","","primary");
+    h+=actBtn("↩ Not received",r.k,"revert","Undo — back to expected","");
   }
-  if(r.st==="missing")h+=actBtn("Not missing?",r.k,"receive");
-  h+=actBtn("✎",r.p.id,"edit","Edit provider");
-  h+=actBtn("✕",r.k,"remove","Remove from this month");
+  h+=actBtn("✎",r.p.id,"edit","Edit provider","");
+  h+=actBtn("✕",r.k,"remove","Remove from this month","");
   return h;
 }
-function actBtn(label,arg,action,title){
-  return '<button data-action="'+action+'" data-arg="'+esc(arg)+'"'+(title?' title="'+esc(title)+'"':'')+(action==="receive"||action==="pay"?' class="primary"':'')+'>'+esc(label)+'</button>';
+function actBtn(label,arg,action,title,cls){
+  return '<button data-action="'+esc(action)+'" data-arg="'+esc(arg)+'"'+
+    (title?' title="'+esc(title)+'"':'')+
+    (cls?' class="'+cls+'"':'')+'>'+esc(label)+'</button>';
 }
 
 /* delegated clicks on the checklist (handlers survive re-render) */
@@ -530,7 +536,7 @@ function askDeleteAccount(id){
     const pre=target+"|";
     for(const k of Object.keys(store.entries))if(k.startsWith(pre))delete store.entries[k];
     store.accounts=store.accounts.filter(x=>x.id!==target);
-    if(curAcct===target)curAcct=store.accounts.length?"ALL":"ALL";
+    if(curAcct===target)curAcct="ALL";
     save();render();
   });
   if(document.getElementById("accountModal").style.display==="block")closeModal();
@@ -659,7 +665,7 @@ function importData(){
       const s=JSON.parse(r.result);
       if(!Array.isArray(s.accounts)||!Array.isArray(s.providers))throw 0;
       store=s;save();
-      curAcct=store.accounts.length?"ALL":"ALL";
+      curAcct="ALL";
       render();
     }catch(e){
       askConfirm("Import failed","That file doesn't look like a Bill Radar backup.","OK",null);
