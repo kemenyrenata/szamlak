@@ -165,7 +165,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <input id="pCatCustom" placeholder="Custom category name" style="display:none;margin-top:6px;">
       <label>Service provider (company / sender)</label>
       <input id="pVendor" placeholder="e.g. Green Energy Co., Budapest Waterworks…">
-      <label>Custom label (optional — leave blank to show “Category – Service provider”)</label>
+      <label>Custom label (optional — overrides the service provider name in the list)</label>
       <input id="pLabel" placeholder="e.g. Living room radiator gas bill">
       <label>Frequency</label>
       <select id="pFreq">
@@ -239,12 +239,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
 <script>
 "use strict";
 let store=null, memStore=null;
-let curAcct="ALL";       // account id or "ALL"
+let curAcct="ALL";
 let viewOffset=0;
 let confirmCb=null, editAcctId=null, provEditId=null, receiveKey=null, pickerYear=null;
 const MS_DAY=86400000;
 const BASE_CATS=["Electricity","Water","Gas","Heating","Internet","Phone","TV","Rent","Property tax","Insurance","Garbage","Sewage","Maintenance","Subscription","Other"];
-const CAT_ICONS={Electricity:"⚡",Water:"💧",Gas:"🔥",Heating:"🌡️",Internet:"🌐",Phone:"📱",TV:"📺",Rent:"🏠","Property tax":"🏛️",Insurance:"🛡️",Garbage:"🗑️",Sewage:"🚰",Maintenance:"🔧",Subscription:"🎬",Other:"📄"};
+const CAT_ICONS={Electricity:"⚡",Water:"💧",Gas:"🔥",Heating:"♨️",Internet:"🌐",Phone:"📱",TV:"📺",Rent:"🏠","Property tax":"🏛️",Insurance:"🛡️",Garbage:"🗑️",Sewage:"🚰",Maintenance:"🔧",Subscription:"🎬",Other:"📄"};
 
 function storageOk(){ try{localStorage.setItem("__t","1");localStorage.removeItem("__t");return true;}catch(e){return false;} }
 const HAS_STORAGE=storageOk();
@@ -277,10 +277,10 @@ function allCats(){
   store.providers.forEach(p=>{ if(p.cat)s.add(p.cat); });
   return Array.from(s);
 }
+/* display name: custom label wins, otherwise just the service provider (category lives in the purple chip) */
 function provDisplay(p){
   if(p.label)return p.label;
-  const cat=p.cat||"Uncategorised";
-  return p.vendor?(cat+" – "+p.vendor):cat;
+  return p.vendor||"";
 }
 
 /* ---------- modal plumbing ---------- */
@@ -384,11 +384,13 @@ function render(){
       const diff=(r.p.amount!=null&&r.entry&&r.entry.actual!=null)?(r.entry.actual-r.p.amount):null;
       const pct=diff!=null&&r.p.amount?Math.abs(diff)/r.p.amount:0;
       const acctChip=(all&&store.accounts.length>1)?'<span class="acctchip">'+esc((acctById(r.p.acct)||{}).name||"")+'</span>':"";
+      // vendor shown in the meta line only when a custom label hides it from the title
+      const vendorMeta=(r.p.label&&r.p.vendor)?esc(r.p.vendor)+" · ":"";
       html+='<li class="item" style="border-left-color:'+
         (r.st==="paid"?"var(--green)":r.st==="received"?"var(--amber)":(r.st==="missing"||r.st==="overdue")?"var(--red)":"var(--blue)")+'">'+
         '<div class="icon">'+catIcon(r.p.cat)+'</div>'+
         '<div class="info"><div class="name"><span class="cat">'+esc(r.p.cat||"Other")+'</span>'+esc(provDisplay(r.p))+acctChip+' <span class="badge '+r.st+'">'+r.st.toUpperCase()+'</span></div>'+
-        '<div class="meta">'+(r.p.vendor?esc(r.p.vendor)+" · ":"")+FREQ_LABEL[r.p.freq]+' · arrives ~day '+(r.p.arrival||5)+' · due '+(r.entry&&r.entry.due?("until "+r.entry.due):"+ "+(r.p.window||20)+" days")+'</div></div>'+
+        '<div class="meta">'+vendorMeta+FREQ_LABEL[r.p.freq]+' · arrives ~day '+(r.p.arrival||5)+' · due '+(r.entry&&r.entry.due?("until "+r.entry.due):"+ "+(r.p.window||20)+" days")+'</div></div>'+
         '<div class="amount">'+(r.entry&&r.entry.actual!=null?ft(r.entry.actual):"")+
         (r.p.amount!=null?'<div class="meta" style="text-align:right">exp. '+ft(r.p.amount)+(diff!=null?(' <span class="'+(pct>0.1?'diff-bad':'diff-ok')+'">'+(diff>0?'+':'')+ft(diff)+'</span>'):"")+'</div>':"")+
         '</div><div class="actions">'+actionsFor(r)+'</div></li>';
@@ -443,7 +445,6 @@ function renderFilters(){
 }
 function stat(l,v,warn){return '<div class="stat'+(warn?" warn":"")+'"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>';}
 
-/* buttons rendered as plain HTML with data-attributes; clicks handled via delegation below */
 function actionsFor(r){
   if(r.st==="paid")
     return actBtn("↩ Undo payment",r.k,"undopay","Back to received","");
@@ -463,7 +464,6 @@ function actBtn(label,arg,action,title,cls){
     (cls?' class="'+cls+'"':'')+'>'+esc(label)+'</button>';
 }
 
-/* delegated clicks on the checklist (handlers survive re-render) */
 document.getElementById("checklist").addEventListener("click",ev=>{
   const b=ev.target.closest("button[data-action]");
   if(!b)return;
