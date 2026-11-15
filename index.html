@@ -41,6 +41,8 @@ main{max-width:860px;margin:0 auto;padding:16px;}
 .account-tabs button.tab .mini:hover{background:rgba(0,0,0,.08);}
 .account-tabs button.addtab{padding:10px 14px;border-radius:10px;border:1px dashed var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:14px;font-weight:600;}
 .account-tabs button.addtab:hover{border-color:var(--purple);color:var(--purple);}
+.account-tabs button.alltab{padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;font-weight:600;color:var(--muted);}
+.account-tabs button.alltab.active{background:var(--purple-light);border-color:var(--purple);color:var(--purple);}
 .filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;}
 .filters label{font-size:12.5px;color:var(--muted);font-weight:600;}
 .filters select{padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--card);color:var(--text);font-family:inherit;}
@@ -54,13 +56,13 @@ main{max-width:860px;margin:0 auto;padding:16px;}
 .month-nav #monthLabel{font-size:17px;font-weight:600;cursor:pointer;padding:4px 12px;border-radius:8px;}
 .month-nav #monthLabel:hover{background:var(--purple-light);color:var(--purple);}
 .month-nav .today{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;padding:6px 12px;cursor:pointer;font-size:12.5px;font-weight:700;}
-.month-nav .today:hover{filter:brightness(.95);}
 ul.items{list-style:none;}
 li.item{background:var(--card);border:1px solid var(--border);border-left:5px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
 .item .icon{width:42px;height:42px;border-radius:11px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
 .item .info{flex:1;min-width:180px;}
 .item .name{font-weight:700;}
 .item .cat{display:inline-block;font-size:11px;font-weight:600;color:var(--purple);background:var(--purple-light);border-radius:6px;padding:2px 7px;margin-right:6px;vertical-align:1px;}
+.item .acctchip{display:inline-block;font-size:11px;font-weight:600;color:#5a54d6;background:#ededfb;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:1px;}
 .item .meta{font-size:12.5px;color:var(--muted);}
 .badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;white-space:nowrap;}
 .badge.expected{background:var(--blue-bg);color:var(--blue);}
@@ -89,7 +91,6 @@ li.item{background:var(--card);border:1px solid var(--border);border-left:5px so
 .chk{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13.5px;}
 .chk label{margin:0;color:var(--text);}
 .hint{font-size:12px;color:var(--muted);margin-top:4px;}
-/* month picker */
 .picker-year{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .picker-year span{font-size:18px;font-weight:700;}
 .picker-year button{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;width:34px;height:30px;cursor:pointer;font-size:16px;font-weight:700;}
@@ -106,17 +107,17 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
 <body>
 <header>
   <h1>🧾 Bill Radar</h1>
-  <button onclick="openAccountDlg()">＋ Account</button>
-  <button onclick="headerAddProvider()">＋ Provider</button>
-  <button onclick="exportData()">⤓ Export</button>
-  <button onclick="importData()">⤒ Import</button>
-  <button onclick="askReset()" title="Delete everything">🗑</button>
+  <button id="btnAddAcct">＋ Account</button>
+  <button id="btnAddProv">＋ Provider</button>
+  <button id="btnExport">⤓ Export</button>
+  <button id="btnImport">⤒ Import</button>
+  <button id="btnReset" title="Delete everything">🗑</button>
 </header>
 <main>
   <div class="welcome" id="welcome" style="display:none">
     <h2>Welcome to Bill Radar 👋</h2>
     <p>Create your first account to start tracking recurring invoices. Each account keeps its own providers and monthly checklists — you can add, rename or delete accounts anytime.</p>
-    <button class="bigbtn" onclick="openAccountDlg()">＋ Create your first account</button>
+    <button class="bigbtn" id="btnFirstAccount">＋ Create your first account</button>
   </div>
   <div id="appContent" style="display:none">
     <div class="account-tabs" id="acctTabs"></div>
@@ -146,10 +147,10 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <input id="aName" placeholder="e.g. Household, Rental flat, Business…">
       <div class="err" id="aErr"></div>
       <div class="btns">
-        <button id="aDeleteBtn" class="danger" style="display:none" onclick="askDeleteAccount()">Delete</button>
+        <button id="aDeleteBtn" class="danger" style="display:none">Delete</button>
         <span class="spacer"></span>
-        <button onclick="closeModal()">Cancel</button>
-        <button class="primary" onclick="saveAccount()">Save</button>
+        <button class="cClose">Cancel</button>
+        <button class="primary" id="aSaveBtn">Save</button>
       </div>
     </div>
   </div>
@@ -186,8 +187,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <div class="err" id="pErr"></div>
       <div class="btns">
         <span class="spacer"></span>
-        <button onclick="closeModal()">Cancel</button>
-        <button class="primary" onclick="saveProvider()">Save</button>
+        <button class="cClose">Cancel</button>
+        <button class="primary" id="pSaveBtn">Save</button>
       </div>
     </div>
   </div>
@@ -202,8 +203,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <input id="rDue" type="date">
       <div class="btns">
         <span class="spacer"></span>
-        <button onclick="closeModal()">Cancel</button>
-        <button class="primary" onclick="confirmReceive()">OK</button>
+        <button class="cClose">Cancel</button>
+        <button class="primary" id="rOkBtn">OK</button>
       </div>
     </div>
   </div>
@@ -214,8 +215,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <p id="cText" style="color:var(--muted);font-size:14px;"></p>
       <div class="btns">
         <span class="spacer"></span>
-        <button onclick="closeModal()">Cancel</button>
-        <button id="cOk" class="danger" onclick="doConfirm()">Delete</button>
+        <button class="cClose">Cancel</button>
+        <button id="cOk" class="danger">Delete</button>
       </div>
     </div>
   </div>
@@ -230,7 +231,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       </div>
       <div class="picker-grid" id="pyGrid"></div>
       <div class="picker-quick"><button id="pyToday">↩ Today</button></div>
-      <div class="btns"><span class="spacer"></span><button onclick="closeModal()">Close</button></div>
+      <div class="btns"><span class="spacer"></span><button class="cClose">Close</button></div>
     </div>
   </div>
 </div>
@@ -238,7 +239,8 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
 <script>
 "use strict";
 let store=null, memStore=null;
-let curAcct=null, viewOffset=0;
+let curAcct="ALL";       // account id or "ALL"
+let viewOffset=0;
 let confirmCb=null, editAcctId=null, provEditId=null, receiveKey=null, pickerYear=null;
 const MS_DAY=86400000;
 const BASE_CATS=["Electricity","Water","Gas","Heating","Internet","Phone","TV","Rent","Property tax","Insurance","Garbage","Sewage","Maintenance","Subscription","Other"];
@@ -256,7 +258,6 @@ function load(){
 }
 function uid(){return Math.random().toString(36).slice(2,10);}
 function acctById(id){return store.accounts.find(a=>a.id===id);}
-// monthKey derived from explicit base date arithmetic, offset applied via new Date()
 function baseNow(){ const d=new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); }
 function monthKey(off){
   const b=baseNow();
@@ -311,9 +312,7 @@ function init(){
   store.providers.forEach(p=>{
     if(!p.cat&&!p.vendor&&p.name){ p.label=p.label||p.name; delete p.name; }
   });
-  if(!curAcct||!store.accounts.some(a=>a.id===curAcct)){
-    curAcct=store.accounts[0]?store.accounts[0].id:null;
-  }
+  if(store.accounts.length===0)curAcct="ALL";
 }
 
 /* ---------- status logic ---------- */
@@ -346,18 +345,19 @@ function render(){
   }
   renderTabs();
   renderFilters();
-  const acct=acctById(curAcct);
+  const all=curAcct==="ALL";
+  const acct=all?null:acctById(curAcct);
   const mk=monthKey(viewOffset),mkDate=mk.date,today=new Date();
-  document.getElementById("monthLabel").textContent=fmtMonth(mkDate)+(acct?" · "+esc(acct.name):"");
+  document.getElementById("monthLabel").textContent=fmtMonth(mkDate)+(acct?" · "+esc(acct.name):(all&&store.accounts.length>1?" · All accounts":""));
 
   const fCat=document.getElementById("filterCat").value;
   const fVendor=document.getElementById("filterProv").value;
   const rows=[];
-  store.providers.filter(p=>p.acct===curAcct).forEach(p=>{
+  store.providers.filter(p=>all||p.acct===curAcct).forEach(p=>{
     if(!expectsIn(p,mk.key))return;
     if(fCat&&(p.cat||"")!==fCat)return;
     if(fVendor&&(p.vendor||"")!==fVendor)return;
-    const k=ekey(curAcct,mk.key,p.id);
+    const k=ekey(p.acct,mk.key,p.id);
     rows.push({p,entry:store.entries[k],st:getStatus(p,store.entries[k],mkDate,today),k});
   });
   rows.sort((a,b)=>(a.p.arrival||5)-(b.p.arrival||5));
@@ -365,23 +365,26 @@ function render(){
   const c=s=>rows.filter(r=>r.st===s).length;
   const alerts=c("missing")+c("overdue");
   const paidSum=rows.reduce((s,r)=>s+(r.entry&&r.entry.status==="paid"?+r.entry.actual||0:0),0);
+  const openSum=rows.reduce((s,r)=>s+(r.entry&&r.entry.status==="received"?+r.entry.actual||0:0),0);
   document.getElementById("summary").innerHTML=
     stat("Needs attention",alerts,alerts>0)+stat("Expected",c("expected")+c("missing"))+
     stat("Received",c("received"))+stat("Paid",c("paid"))+
+    '<div class="stat"><div class="label">Open amount</div><div class="value">'+ft(openSum)+'</div></div>'+
     '<div class="stat"><div class="label">Paid this month</div><div class="value">'+ft(paidSum)+'</div></div>';
 
   const list=document.getElementById("checklist");
   if(rows.length===0){
-    list.innerHTML='<div class="empty">'+(fCat||fVendor?"No invoices match the current filters in ":"No invoices expected for ")+(fCat||fVendor?"":(acct?esc(acct.name)+" in ":""))+fmtMonth(mkDate)+'.<br>'+(fCat||fVendor?"Clear the filters above, or":"Add a provider, use ‹ ›, or click the month name to jump anywhere.")+'</div>';
+    list.innerHTML='<div class="empty">'+(fCat||fVendor?"No invoices match the current filters in ":"No invoices expected for ")+(fCat||fVendor?"":(acct?esc(acct.name)+" in ":fmtMonth(mkDate)+": "))+fmtMonth(mkDate)+'.<br>'+(fCat||fVendor?"Clear the filters above, or":"Add a provider, use ‹ ›, or click the month name to jump anywhere.")+'</div>';
   }else{
     let html='<ul class="items">';
     rows.forEach(r=>{
       const diff=(r.p.amount!=null&&r.entry&&r.entry.actual!=null)?(r.entry.actual-r.p.amount):null;
       const pct=diff!=null&&r.p.amount?Math.abs(diff)/r.p.amount:0;
+      const acctChip=(all&&store.accounts.length>1)?'<span class="acctchip">'+esc((acctById(r.p.acct)||{}).name||"")+'</span>':"";
       html+='<li class="item" style="border-left-color:'+
         (r.st==="paid"?"var(--green)":r.st==="received"?"var(--amber)":(r.st==="missing"||r.st==="overdue")?"var(--red)":"var(--blue)")+'">'+
         '<div class="icon">'+catIcon(r.p.cat)+'</div>'+
-        '<div class="info"><div class="name"><span class="cat">'+esc(r.p.cat||"Other")+'</span>'+esc(provDisplay(r.p))+' <span class="badge '+r.st+'">'+r.st.toUpperCase()+'</span></div>'+
+        '<div class="info"><div class="name"><span class="cat">'+esc(r.p.cat||"Other")+'</span>'+esc(provDisplay(r.p))+acctChip+' <span class="badge '+r.st+'">'+r.st.toUpperCase()+'</span></div>'+
         '<div class="meta">'+(r.p.vendor?esc(r.p.vendor)+" · ":"")+FREQ_LABEL[r.p.freq]+' · arrives ~day '+(r.p.arrival||5)+' · due '+(r.entry&&r.entry.due?("until "+r.entry.due):"+ "+(r.p.window||20)+" days")+'</div></div>'+
         '<div class="amount">'+(r.entry&&r.entry.actual!=null?ft(r.entry.actual):"")+
         (r.p.amount!=null?'<div class="meta" style="text-align:right">exp. '+ft(r.p.amount)+(diff!=null?(' <span class="'+(pct>0.1?'diff-bad':'diff-ok')+'">'+(diff>0?'+':'')+ft(diff)+'</span>'):"")+'</div>':"")+
@@ -394,16 +397,26 @@ function render(){
 function renderTabs(){
   const tabs=document.getElementById("acctTabs");
   tabs.innerHTML="";
+  if(store.accounts.length>1){
+    const all=document.createElement("button");
+    all.className=(curAcct==="ALL")?"alltab active":"alltab";
+    all.textContent="🗂 All accounts";
+    all.addEventListener("click",()=>{curAcct="ALL";viewOffset=0;render();});
+    tabs.appendChild(all);
+  }
   store.accounts.forEach(a=>{
     const b=document.createElement("button");
     b.className="tab"+(a.id===curAcct?" active":"");
     if(a.id===curAcct){
-      b.innerHTML='<span>'+esc(a.name)+'</span>'+
-        '<span class="mini" title="Rename account">✎</span>'+
-        (store.accounts.length>1?'<span class="mini" title="Delete account">🗑</span>':"");
-      b.querySelector(".mini[title='Rename account']").addEventListener("click",ev=>{ev.stopPropagation();openAccountDlg(a.id);});
-      const del=b.querySelector(".mini[title='Delete account']");
-      if(del)del.addEventListener("click",ev=>{ev.stopPropagation();askDeleteAccount(a.id);});
+      const nm=document.createElement("span");nm.textContent=a.name;b.appendChild(nm);
+      const ed=document.createElement("span");ed.className="mini";ed.title="Rename account";ed.textContent="✎";
+      ed.addEventListener("click",ev=>{ev.stopPropagation();openAccountDlg(a.id);});
+      b.appendChild(ed);
+      if(store.accounts.length>1){
+        const dl=document.createElement("span");dl.className="mini";dl.title="Delete account";dl.textContent="🗑";
+        dl.addEventListener("click",ev=>{ev.stopPropagation();askDeleteAccount(a.id);});
+        b.appendChild(dl);
+      }
     }else{
       b.textContent=a.name;
     }
@@ -420,47 +433,53 @@ function renderFilters(){
   const catSel=document.getElementById("filterCat");
   const prevC=catSel.value;
   catSel.innerHTML='<option value="">All</option>'+cats.map(c=>'<option value="'+esc(c)+'"'+(c===prevC?" selected":"")+'>'+esc(c)+'</option>').join("");
-  const vendors=new Set(store.providers.filter(p=>p.acct===curAcct&&p.vendor).map(p=>p.vendor));
+  const vendors=new Set(store.providers.filter(p=>(curAcct==="ALL"||p.acct===curAcct)&&p.vendor).map(p=>p.vendor));
   const vSel=document.getElementById("filterProv");
   const prevV=vSel.value;
   vSel.innerHTML='<option value="">All</option>'+Array.from(vendors).sort().map(v=>'<option value="'+esc(v)+'"'+(v===prevV?" selected":"")+'>'+esc(v)+'</option>').join("");
 }
 function stat(l,v,warn){return '<div class="stat'+(warn?" warn":"")+'"><div class="label">'+l+'</div><div class="value">'+v+'</div></div>';}
 function actionsFor(r){
-  const aid=r.p.id, key=r.k;
-  if(r.st==="paid"){
-    return btn("↩ Undo","",()=>undo(key));
+  if(r.st==="paid")
+    return actBtn("↩ Undo payment","",r.k,"undopay","Back to received");
+  let h="";
+  if(r.st!=="received")h+=actBtn("✓ Received","primary",r.k,"receive","");
+  if(r.st==="received"||r.st==="overdue"){
+    h+=actBtn("💰 Paid","primary",r.k,"pay","");
+    h+=actBtn("↩ Not received","",r.k,"revert","Undo — back to expected");
   }
-  let acts=[];
-  if(r.st!=="received")acts.push(btn("✓ Received","primary",()=>openReceive(key)));
-  if(r.st==="received"||r.st==="overdue")acts.push(btn("💰 Paid","primary",()=>markPaid(key)));
-  if(r.st==="missing")acts.push(btn("Not missing?","",()=>openReceive(key)));
-  acts.push(btn("✎","",()=>openProviderDlg(aid),"Edit provider"));
-  acts.push(btn("✕","",()=>askRemoveEntry(key),"Remove from this month"));
-  return acts.join("");
+  if(r.st==="missing")h+=actBtn("Not missing?",r.k,"receive");
+  h+=actBtn("✎",r.p.id,"edit","Edit provider");
+  h+=actBtn("✕",r.k,"remove","Remove from this month");
+  return h;
 }
-function btn(label,cls,fn,title){
-  const b=document.createElement("button");
-  if(cls)b.className=cls;
-  b.textContent=label;
-  if(title)b.title=title;
-  b.addEventListener("click",ev=>{ev.stopPropagation();fn();});
-  return b.outerHTML;
+function actBtn(label,arg,action,title){
+  return '<button data-action="'+action+'" data-arg="'+esc(arg)+'"'+(title?' title="'+esc(title)+'"':'')+(action==="receive"||action==="pay"?' class="primary"':'')+'>'+esc(label)+'</button>';
 }
+
+/* delegated clicks on the checklist (handlers survive re-render) */
+document.getElementById("checklist").addEventListener("click",ev=>{
+  const b=ev.target.closest("button[data-action]");
+  if(!b)return;
+  const action=b.getAttribute("data-action"), arg=b.getAttribute("data-arg");
+  if(action==="receive")openReceive(arg);
+  else if(action==="pay")markPaid(arg);
+  else if(action==="undopay")undoPay(arg);
+  else if(action==="revert")askRevert(arg);
+  else if(action==="remove")askRemoveEntry(arg);
+  else if(action==="edit")openProviderDlg(arg);
+});
 
 /* ---------- month navigation ---------- */
 function shiftMonth(d){viewOffset+=d;render();}
 function goToday(){viewOffset=0;render();}
-function gotoMonth(y,m){ // m: 1-12
+function gotoMonth(y,m){
   const b=baseNow();
   viewOffset=(y-b.getFullYear())*12+(m-1-b.getMonth());
   render();
 }
-
-/* month picker */
 function openPicker(){
-  const mk=monthKey(viewOffset);
-  pickerYear=mk.date.getFullYear();
+  pickerYear=monthKey(viewOffset).date.getFullYear();
   renderPicker();
   openModal("pickerModal");
 }
@@ -511,7 +530,7 @@ function askDeleteAccount(id){
     const pre=target+"|";
     for(const k of Object.keys(store.entries))if(k.startsWith(pre))delete store.entries[k];
     store.accounts=store.accounts.filter(x=>x.id!==target);
-    if(curAcct===target)curAcct=store.accounts[0].id;
+    if(curAcct===target)curAcct=store.accounts.length?"ALL":"ALL";
     save();render();
   });
   if(document.getElementById("accountModal").style.display==="block")closeModal();
@@ -530,7 +549,7 @@ function openProviderDlg(id){
   sel.innerHTML="";
   store.accounts.forEach(a=>{const o=document.createElement("option");o.value=a.id;o.textContent=a.name;sel.appendChild(o);});
   const p=id?store.providers.find(x=>x.id===id):null;
-  sel.value=p?p.acct:curAcct;
+  sel.value=p?p.acct:(curAcct!=="ALL"?curAcct:store.accounts[0].id);
   const catSel=document.getElementById("pCat");
   catSel.innerHTML=allCats().map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join("");
   if(p&&p.cat&&!BASE_CATS.includes(p.cat)){
@@ -539,6 +558,7 @@ function openProviderDlg(id){
     }
   }
   catSel.value=p?(p.cat||"Other"):"Electricity";
+  document.getElementById("pCatCustom").style.display=(catSel.value==="Other")?"":"none";
   if(p&&p.cat&&!BASE_CATS.includes(p.cat))document.getElementById("pCatCustom").value=p.cat;
   document.getElementById("pVendor").value=p?(p.vendor||""):"";
   document.getElementById("pLabel").value=p?(p.label||""):"";
@@ -572,16 +592,16 @@ function saveProvider(){
   save();closeModal();render();
 }
 
-/* ---------- receive / pay ---------- */
+/* ---------- receive / pay / undo ---------- */
 function openReceive(k){
   receiveKey=k;
   const [,mk,pid]=k.split("|");
   const p=store.providers.find(x=>x.id===pid);
   const d=mkDateOf(mk);
-  d=new Date(d.getFullYear(),d.getMonth(),Math.min(p.arrival||5,28));
-  d.setDate(d.getDate()+(p.window||20));
+  const due=new Date(d.getFullYear(),d.getMonth(),Math.min(p.arrival||5,28));
+  due.setDate(due.getDate()+(p.window||20));
   document.getElementById("rAmount").value=(p.amount!=null?String(p.amount):"");
-  document.getElementById("rDue").value=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  document.getElementById("rDue").value=due.getFullYear()+"-"+String(due.getMonth()+1).padStart(2,"0")+"-"+String(due.getDate()).padStart(2,"0");
   const diffEl=document.getElementById("rDiff");
   const updateDiff=val=>{
     if(p.amount!=null&&val!==""){
@@ -604,10 +624,21 @@ function confirmReceive(){
 }
 function markPaid(k){
   const e=store.entries[k];if(!e)return;
-  e.status="paid";e.paidOn=new Date().toISOString().slice(0,10);
+  e.status="paid";
+  e.paidOn=new Date().toISOString().slice(0,10);
   save();render();
 }
-function undo(k){delete store.entries[k];save();render();}
+function undoPay(k){
+  const e=store.entries[k];if(!e)return;
+  e.status="received";
+  delete e.paidOn;
+  save();render();
+}
+function askRevert(k){
+  askConfirm("Not received after all?","This undoes the “received” status — the entry goes back to Expected (the amount and due date you entered are discarded).","Undo",()=>{
+    delete store.entries[k];save();render();
+  });
+}
 function askRemoveEntry(k){
   askConfirm("Remove entry?","Remove this entry from this month? It will come back in its next billing cycle.","Remove",()=>{
     delete store.entries[k];save();render();
@@ -628,7 +659,7 @@ function importData(){
       const s=JSON.parse(r.result);
       if(!Array.isArray(s.accounts)||!Array.isArray(s.providers))throw 0;
       store=s;save();
-      curAcct=store.accounts[0]?store.accounts[0].id:null;
+      curAcct=store.accounts.length?"ALL":"ALL";
       render();
     }catch(e){
       askConfirm("Import failed","That file doesn't look like a Bill Radar backup.","OK",null);
@@ -639,11 +670,11 @@ function importData(){
 function askReset(){
   askConfirm("Delete everything?","This removes all accounts, providers and history, and starts from an empty state. Export a backup first if you want to keep anything.","Delete everything",()=>{
     store={accounts:[],providers:[],entries:{},lastReviewedMonth:""};
-    curAcct=null;save();render();
+    curAcct="ALL";save();render();
   });
 }
 
-/* ---------- wiring (all listeners attached here, no inline handlers on dynamic parts) ---------- */
+/* ---------- wiring ---------- */
 function wire(){
   document.getElementById("btnPrev").addEventListener("click",()=>shiftMonth(-1));
   document.getElementById("btnNext").addEventListener("click",()=>shiftMonth(1));
@@ -658,6 +689,18 @@ function wire(){
   document.getElementById("pCat").addEventListener("change",()=>{
     document.getElementById("pCatCustom").style.display=(document.getElementById("pCat").value==="Other")?"":"none";
   });
+  document.getElementById("btnAddAcct").addEventListener("click",()=>openAccountDlg());
+  document.getElementById("btnAddProv").addEventListener("click",headerAddProvider);
+  document.getElementById("btnExport").addEventListener("click",exportData);
+  document.getElementById("btnImport").addEventListener("click",importData);
+  document.getElementById("btnReset").addEventListener("click",askReset);
+  document.getElementById("btnFirstAccount").addEventListener("click",()=>openAccountDlg());
+  document.getElementById("aSaveBtn").addEventListener("click",saveAccount);
+  document.getElementById("aDeleteBtn").addEventListener("click",()=>askDeleteAccount());
+  document.getElementById("pSaveBtn").addEventListener("click",saveProvider);
+  document.getElementById("rOkBtn").addEventListener("click",confirmReceive);
+  document.getElementById("cOk").addEventListener("click",doConfirm);
+  document.querySelectorAll(".cClose").forEach(b=>b.addEventListener("click",closeModal));
   document.addEventListener("keydown",e=>{ if(e.key==="Escape")closeModal(); });
 }
 
