@@ -358,6 +358,7 @@ function render(){
     if(fCat&&(p.cat||"")!==fCat)return;
     if(fVendor&&(p.vendor||"")!==fVendor)return;
     const k=ekey(p.acct,mk.key,p.id);
+    if(store.entries[k]&&store.entries[k].status==="skipped")return; // removed from this month only
     rows.push({p,entry:store.entries[k],st:getStatus(p,store.entries[k],mkDate,today),k});
   });
   rows.sort((a,b)=>(a.p.arrival||5)-(b.p.arrival||5));
@@ -647,7 +648,7 @@ function askRevert(k){
 }
 function askRemoveEntry(k){
   askConfirm("Remove entry?","Remove this entry from this month? It will come back in its next billing cycle.","Remove",()=>{
-    delete store.entries[k];save();render();
+    store.entries[k]={status:"skipped"};save();render();
   });
 }
 
