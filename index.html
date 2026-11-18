@@ -176,6 +176,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       </select>
       <label>Expected amount in Ft (leave blank if variable)</label>
       <input id="pAmount" type="number" min="0" step="1">
+      <div id="pAmountFromWrap" style="display:none">
+        <label>Amount applies from month</label>
+        <input id="pAmountFrom" type="month">
+        <div class="hint">Changing the amount only affects this month and later. Earlier months keep their old expected amount.</div>
+      </div>
       <label>Invoice usually arrives on day of month</label>
       <input id="pArrival" type="number" min="1" max="28" value="5">
       <label>Payment due days after arrival</label>
@@ -269,6 +274,11 @@ const FREQ_LABEL={1:"Monthly",3:"Quarterly",6:"Half-yearly",12:"Yearly"};
 function fmtMonth(d){return MONTHS[d.getMonth()]+" "+d.getFullYear();}
 function ft(n){return n==null||n===""?"—":Number(n).toLocaleString("hu-HU")+" Ft";}
 function ekey(a,mk,p){return a+"|"+mk+"|"+p;}
+function expectedFor(p,mk){
+  let amt=p.amount!=null?p.amount:null;
+  (p.amounts||[]).slice().sort((a,b)=>a.from<b.from?-1:1).forEach(h=>{if(h.from<=mk)amt=h.amount;});
+  return amt;
+}
 function mkDateOf(mk){return new Date(+mk.slice(0,4),+mk.slice(5,7)-1,1);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function catIcon(cat){return CAT_ICONS[cat]||"📄";}
@@ -382,8 +392,9 @@ function render(){
   }else{
     let html='<ul class="items">';
     rows.forEach(r=>{
-      const diff=(r.p.amount!=null&&r.entry&&r.entry.actual!=null)?(r.entry.actual-r.p.amount):null;
-      const pct=diff!=null&&r.p.amount?Math.abs(diff)/r.p.amount:0;
+      const exp=expectedFor(r.p,mk.key);
+      const diff=(exp!=null&&r.entry&&r.entry.actual!=null)?(r.entry.actual-exp):null;
+      const pct=diff!=null&&exp?Math.abs(diff)/exp:0;
       const acctChip=(all&&store.accounts.length>1)?'<span class="acctchip">'+esc((acctById(r.p.acct)||{}).name||"")+'</span>':"";
       // vendor shown in the meta line only when a custom label hides it from the title
       const vendorMeta=(r.p.label&&r.p.vendor)?esc(r.p.vendor)+" · ":"";
@@ -393,7 +404,7 @@ function render(){
         '<div class="info"><div class="name"><span class="cat">'+esc(r.p.cat||"Other")+'</span>'+esc(provDisplay(r.p))+acctChip+' <span class="badge '+r.st+'">'+r.st.toUpperCase()+'</span></div>'+
         '<div class="meta">'+vendorMeta+FREQ_LABEL[r.p.freq]+' · arrives ~day '+(r.p.arrival||5)+' · due '+(r.entry&&r.entry.due?("until "+r.entry.due):"+ "+(r.p.window||20)+" days")+'</div></div>'+
         '<div class="amount">'+(r.entry&&r.entry.actual!=null?ft(r.entry.actual):"")+
-        (r.p.amount!=null?'<div class="meta" style="text-align:right">exp. '+ft(r.p.amount)+(diff!=null?(' <span class="'+(pct>0.1?'diff-bad':'diff-ok')+'">'+(diff>0?'+':'')+ft(diff)+'</span>'):"")+'</div>':"")+
+        (exp!=null?'<div class="meta" style="text-align:right">exp. '+ft(exp)+(diff!=null?(' <span class="'+(pct>0.1?'diff-bad':'diff-ok')+'">'+(diff>0?'+':'')+ft(diff)+'</span>'):"")+'</div>':"")+
         '</div><div class="actions">'+actionsFor(r)+'</div></li>';
     });
     list.innerHTML=html+'</ul>';
@@ -570,7 +581,12 @@ function openProviderDlg(id){
   document.getElementById("pVendor").value=p?(p.vendor||""):"";
   document.getElementById("pLabel").value=p?(p.label||""):"";
   document.getElementById("pFreq").value=p?p.freq:1;
-  document.getElementById("pAmount").value=p&&p.amount!=null?p.amount:"";
+  const fromEl=document.getElementById("pAmountFrom");
+  document.getElementById("pAmountFromWrap").style.display=p?"":"none";
+  fromEl.value=monthKey(viewOffset).key;
+  const ea=p?expectedFor(p,fromEl.value):null;
+  document.getElementById("pAmount").value=ea!=null?ea:"";
+  fromEl.onchange=()=>{ if(p&&fromEl.value){const v=expectedFor(p,fromEl.value);document.getElementById("pAmount").value=v!=null?v:"";} };
   document.getElementById("pArrival").value=p?(p.arrival||5):5;
   document.getElementById("pWindow").value=p?(p.window||20):20;
   document.getElementById("pAnchor").value=p?(p.anchor||monthKey(0).key):monthKey(0).key;
@@ -594,8 +610,17 @@ function saveProvider(){
     window:+document.getElementById("pWindow").value||20,
     anchor:document.getElementById("pAnchor").value||monthKey(0).key,
     active:document.getElementById("pActive").checked};
-  if(provEditId)Object.assign(store.providers.find(x=>x.id===provEditId),data);
-  else store.providers.push(Object.assign({id:uid()},data));
+  if(provEditId){
+    const p=store.providers.find(x=>x.id===provEditId);
+    const newAmt=data.amount; delete data.amount; // never overwrite the base amount: history is kept per month
+    const from=document.getElementById("pAmountFrom").value||monthKey(viewOffset).key;
+    if(newAmt!==expectedFor(p,from)){
+      p.amounts=(p.amounts||[]).filter(h=>h.from!==from);
+      p.amounts.push({from:from,amount:newAmt});
+      p.amounts.sort((a,b)=>a.from<b.from?-1:1);
+    }
+    Object.assign(p,data);
+  }else store.providers.push(Object.assign({id:uid()},data));
   save();closeModal();render();
 }
 
@@ -607,16 +632,17 @@ function openReceive(k){
   const d=mkDateOf(mk);
   const due=new Date(d.getFullYear(),d.getMonth(),Math.min(p.arrival||5,28));
   due.setDate(due.getDate()+(p.window||20));
-  document.getElementById("rAmount").value=(p.amount!=null?String(p.amount):"");
+  const expAmt=expectedFor(p,mk);
+  document.getElementById("rAmount").value=(expAmt!=null?String(expAmt):"");
   document.getElementById("rDue").value=due.getFullYear()+"-"+String(due.getMonth()+1).padStart(2,"0")+"-"+String(due.getDate()).padStart(2,"0");
   const diffEl=document.getElementById("rDiff");
   const updateDiff=val=>{
-    if(p.amount!=null&&val!==""){
-      const df=+val-p.amount;
-      diffEl.textContent=df===0?("Matches expected "+ft(p.amount)+".")
-        :("Expected: "+ft(p.amount)+" · Difference: "+(df>0?"+":"")+ft(df));
+    if(expAmt!=null&&val!==""){
+      const df=+val-expAmt;
+      diffEl.textContent=df===0?("Matches expected "+ft(expAmt)+".")
+        :("Expected: "+ft(expAmt)+" · Difference: "+(df>0?"+":"")+ft(df));
     }else{
-      diffEl.textContent=p.amount!=null?("Expected: "+ft(p.amount)):"Variable amount — check previous months in history.";
+      diffEl.textContent=expAmt!=null?("Expected: "+ft(expAmt)):"Variable amount — check previous months in history.";
     }
   };
   updateDiff(document.getElementById("rAmount").value);
