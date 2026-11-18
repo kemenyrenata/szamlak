@@ -101,6 +101,15 @@ li.item{background:var(--card);border:1px solid var(--border);border-left:5px so
 .picker-grid button.cur{box-shadow:0 0 0 2px var(--purple) inset;}
 .picker-quick{margin-top:14px;text-align:center;}
 .picker-quick button{background:var(--purple-light);color:var(--purple);border:none;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;font-weight:700;}
+.pitem{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;}
+.pitem .pn{font-weight:700;font-size:14px;}
+.pitem .pm{font-size:12.5px;color:var(--muted);margin-top:2px;}
+.pitem .pm b{color:var(--text);}
+.pitem .pb{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.pitem .pb button{padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--card);cursor:pointer;font-size:13px;}
+.pitem .pb button.warn{color:var(--red);border-color:var(--red);}
+.pitem.ended{opacity:.7;}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;background:var(--red-bg);color:var(--red);}
 footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
 </style>
 </head>
@@ -109,6 +118,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
   <h1>🧾 Bill Radar</h1>
   <button id="btnAddAcct">＋ Account</button>
   <button id="btnAddProv">＋ Provider</button>
+  <button id="btnProvList">📋 Providers</button>
   <button id="btnExport">⤓ Export</button>
   <button id="btnImport">⤒ Import</button>
   <button id="btnReset" title="Delete everything">🗑</button>
@@ -191,6 +201,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
       <div class="chk"><input type="checkbox" id="pActive" checked><label for="pActive">Active</label></div>
       <div class="err" id="pErr"></div>
       <div class="btns">
+        <button id="pStopBtn" class="danger" style="display:none">Delete future…</button>
         <span class="spacer"></span>
         <button class="cClose">Cancel</button>
         <button class="primary" id="pSaveBtn">Save</button>
@@ -222,6 +233,30 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px;}
         <span class="spacer"></span>
         <button class="cClose">Cancel</button>
         <button id="cOk" class="danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="provListModal">
+    <div class="body">
+      <h3>Providers &amp; current invoices</h3>
+      <div id="provList"></div>
+      <div class="btns"><button id="plAdd">＋ Provider</button><span class="spacer"></span><button class="cClose">Close</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="stopModal">
+    <div class="body">
+      <h3>Delete future invoices</h3>
+      <p id="stopName" style="font-weight:700;font-size:14px;"></p>
+      <label>Delete invoices from this month onward</label>
+      <input id="stopFrom" type="month">
+      <div class="hint" id="stopInfo"></div>
+      <div class="hint">Everything before this month stays untouched.</div>
+      <div class="btns">
+        <span class="spacer"></span>
+        <button class="cClose">Cancel</button>
+        <button id="stopOk" class="danger">Delete future invoices</button>
       </div>
     </div>
   </div>
@@ -279,6 +314,8 @@ function expectedFor(p,mk){
   (p.amounts||[]).slice().sort((a,b)=>a.from<b.from?-1:1).forEach(h=>{if(h.from<=mk)amt=h.amount;});
   return amt;
 }
+function addMonths(mk,n){const d=new Date(+mk.slice(0,4),+mk.slice(5,7)-1+n,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");}
+function fmtMk(mk){return fmtMonth(mkDateOf(mk));}
 function mkDateOf(mk){return new Date(+mk.slice(0,4),+mk.slice(5,7)-1,1);}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
 function catIcon(cat){return CAT_ICONS[cat]||"📄";}
@@ -331,6 +368,7 @@ function expectsIn(p,mk){
   const anchor=p.anchor||"2026-01";
   const dm=(+mk.slice(0,4)-(+anchor.slice(0,4)))*12+((+mk.slice(5,7))-(+anchor.slice(5,7)));
   if(dm<0)return false;
+  if(p.end&&mk>p.end)return false; // billing stopped: no invoices after the end month
   return dm%p.freq===0;
 }
 function getStatus(p,entry,mkDate,today){
@@ -591,6 +629,9 @@ function openProviderDlg(id){
   document.getElementById("pWindow").value=p?(p.window||20):20;
   document.getElementById("pAnchor").value=p?(p.anchor||monthKey(0).key):monthKey(0).key;
   document.getElementById("pActive").checked=p?p.active!==false:true;
+  const sb=document.getElementById("pStopBtn");
+  sb.style.display=p?"":"none";
+  if(p){sb.textContent=p.end?"▶ Resume invoices":"Delete future…";sb.dataset.id=p.id;sb.dataset.mode=p.end?"resume":"stop";}
   openModal("providerModal");
 }
 function saveProvider(){
@@ -622,6 +663,62 @@ function saveProvider(){
     Object.assign(p,data);
   }else store.providers.push(Object.assign({id:uid()},data));
   save();closeModal();render();
+}
+
+/* ---------- providers overview / stop billing ---------- */
+let stopProvId=null;
+function openProvList(){
+  const now=monthKey(0).key, all=curAcct==="ALL";
+  const list=store.providers.filter(p=>all||p.acct===curAcct)
+    .sort((a,b)=>(!!a.end-!!b.end)||provDisplay(a).localeCompare(provDisplay(b)));
+  const box=document.getElementById("provList");
+  if(!list.length){box.innerHTML='<div class="hint">No providers yet.</div>';}
+  else box.innerHTML=list.map(p=>{
+    const ended=!!p.end, amt=expectedFor(p,ended&&p.end<now?p.end:now);
+    const ac=(all&&store.accounts.length>1)?(" · "+esc((acctById(p.acct)||{}).name||"")):"";
+    let status=p.active===false?'<span class="tag">PAUSED</span>':(ended?'<span class="tag">ENDS '+esc(fmtMk(p.end).toUpperCase())+'</span>':"");
+    const ch=(p.amounts||[]).length;
+    return '<div class="pitem'+(ended?' ended':'')+'"><div class="pn">'+esc(provDisplay(p))+status+'</div>'+
+      '<div class="pm">'+esc(p.cat||"Other")+ac+' · '+FREQ_LABEL[p.freq]+' · expected <b>'+(amt!=null?ft(amt):"variable")+'</b>'+(ch?' · '+ch+' price change'+(ch>1?'s':''):'')+'</div>'+
+      '<div class="pb"><button data-pl="edit" data-id="'+esc(p.id)+'">✎ Edit / change amount</button>'+
+      (ended?'<button data-pl="resume" data-id="'+esc(p.id)+'">▶ Resume</button>':'<button class="warn" data-pl="stop" data-id="'+esc(p.id)+'">⏹ Delete future…</button>')+
+      '</div></div>';
+  }).join("");
+  openModal("provListModal");
+}
+function futureCount(p,from){
+  const pre=p.acct+"|";
+  return Object.keys(store.entries).filter(k=>{
+    const [a,mk,pid]=k.split("|");return a===p.acct&&pid===p.id&&mk>=from&&store.entries[k].status!=="skipped";}).length;
+}
+function openStopDlg(id){
+  const p=store.providers.find(x=>x.id===id);if(!p)return;
+  stopProvId=id;
+  document.getElementById("stopName").textContent=provDisplay(p);
+  const f=document.getElementById("stopFrom");
+  f.value=monthKey(viewOffset).key;
+  const upd=()=>{
+    const n=f.value?futureCount(p,f.value):0;
+    document.getElementById("stopInfo").textContent=f.value?
+      ("Last invoice kept: "+fmtMk(addMonths(f.value,-1))+(n?(" · "+n+" recorded entr"+(n>1?"ies":"y")+" from "+fmtMk(f.value)+" on will be deleted."):"")):"";
+  };
+  f.onchange=upd;f.oninput=upd;upd();
+  openModal("stopModal");
+}
+function confirmStop(){
+  const p=store.providers.find(x=>x.id===stopProvId);
+  const from=document.getElementById("stopFrom").value;
+  if(!p||!from)return;
+  p.end=addMonths(from,-1);
+  for(const k of Object.keys(store.entries)){
+    const [a,mk,pid]=k.split("|");
+    if(a===p.acct&&pid===p.id&&mk>=from)delete store.entries[k];
+  }
+  save();closeModal();render();
+}
+function resumeProvider(id){
+  const p=store.providers.find(x=>x.id===id);if(!p)return;
+  delete p.end;save();render();openProvList();
 }
 
 /* ---------- receive / pay / undo ---------- */
@@ -724,6 +821,17 @@ function wire(){
   });
   document.getElementById("btnAddAcct").addEventListener("click",()=>openAccountDlg());
   document.getElementById("btnAddProv").addEventListener("click",headerAddProvider);
+  document.getElementById("btnProvList").addEventListener("click",openProvList);
+  document.getElementById("plAdd").addEventListener("click",headerAddProvider);
+  document.getElementById("provList").addEventListener("click",ev=>{
+    const b=ev.target.closest("button[data-pl]");if(!b)return;
+    const id=b.dataset.id,a=b.dataset.pl;
+    if(a==="edit")openProviderDlg(id);else if(a==="stop")openStopDlg(id);else if(a==="resume")resumeProvider(id);
+  });
+  document.getElementById("pStopBtn").addEventListener("click",e=>{
+    const b=e.currentTarget;if(b.dataset.mode==="resume"){resumeProvider(b.dataset.id);}else openStopDlg(b.dataset.id);
+  });
+  document.getElementById("stopOk").addEventListener("click",confirmStop);
   document.getElementById("btnExport").addEventListener("click",exportData);
   document.getElementById("btnImport").addEventListener("click",importData);
   document.getElementById("btnReset").addEventListener("click",askReset);
